@@ -49,16 +49,28 @@ cmake -S . -B build
 cmake --build build
 ```
 
-That produces `build/sefaultd`. The port is a required argument, there is no default,
-and `site/` is resolved against the working directory — so start it from the project
-root, not from inside `build/`:
+That produces `build/sefaultd`. `site/` is resolved against the working directory,
+so start it from the project root, not from inside `build/`. With no arguments it
+listens on port 8080:
 
 ```bash
-./build/sefaultd 8080
+./build/sefaultd
+```
+
+Options:
+
+| Flag             | Meaning                                        | Default |
+| ---------------- | ----------------------------------------------- | ------- |
+| `-p`, `--port`   | port to listen on                                | `8080`  |
+| `-l`, `--log`    | log level: `DEBUG`, `INFO`, `WARN`, or `ERROR`   | `INFO`  |
+| `-h`, `--help`   | print the option list and exit                   |         |
+
+```bash
+./build/sefaultd --port 9000 --log DEBUG
 ```
 
 There is also a `run` target that builds first and sets the working directory for
-you, hardcoded to port 8080:
+you, on the default port:
 
 ```bash
 cmake --build build --target run
@@ -77,22 +89,29 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release && cmake --build build-re
 curl -i http://localhost:8080/
 ```
 
-The server prints a startup line to stdout and then logs every request to stderr:
+On start-up the server prints its name as ASCII art to stderr, then one line per
+request at the current log level:
 
 ```
-Server listening on port 8080...
+███████╗███████╗███████╗ █████╗ ██╗   ██╗██╗  ████████╗██████╗
+██╔════╝██╔════╝██╔════╝██╔══██╗██║   ██║██║  ╚══██╔══╝██╔══██╗
+███████╗█████╗  █████╗  ███████║██║   ██║██║     ██║   ██║  ██║
+╚════██║██╔══╝  ██╔══╝  ██╔══██║██║   ██║██║     ██║   ██║  ██║
+███████║███████╗██║     ██║  ██║╚██████╔╝███████╗██║   ██████╔╝
+╚══════╝╚══════╝╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝   ╚═════╝  v1.1.0
 
-2026-09-13 20:50:09 [DEBUG] src/http.c:13: thread start, tid 2077185
-2026-09-13 20:50:09 [INFO] src/request.c:13: GET / HTTP/1.
-2026-09-13 20:50:09 [DEBUG] src/handler.c:24: rendering index.html for /
-2026-09-13 20:50:09 [DEBUG] src/cache.c:58: cached ./site/index.html (hash 661261229l)
+2026-09-17 19:34:26 [INFO] server.c:108: Server is listening on port 8080
+2026-09-17 19:34:27 [INFO] src/request.c:13: GET / HTTP/1.
 ```
 
-Source paths in those lines come from `__FILE__`, so they are absolute when CMake was
-pointed at an absolute source directory; they are shortened above.
+On a real terminal the level tag, timestamp and port number are coloured; that is
+stripped above. Every line is written to stderr and, when `logs/` exists relative to
+the working directory, appended to `logs/server.log` as well — a fresh clone already
+has that directory (kept in git with a `.gitkeep`).
 
-Log verbosity is controlled by `log_min` in `include/log.h`, which defaults to
-`LOG_DEBUG`. Raise it to `LOG_INFO` to quiet the per-request rendering lines.
+`INFO` is the default level, which is why the two lines above are all that show.
+`--log DEBUG` (or `-l DEBUG`) adds a line for the file each request resolves to and
+for each page as it enters the cache; `WARN` and `ERROR` show less than `INFO` does.
 
 Routing rules:
 
@@ -102,9 +121,11 @@ Routing rules:
 | `/<name>`     | `site/<name>` if it is an existing regular file | 200    |
 | anything else | `site/not_found.html`                           | 404    |
 
-Every response is sent as `text/html` with a `Content-Length` and
-`Connection: close`. Only the request line is parsed; request headers are read off
-the socket but ignored.
+`Content-Type` is guessed from the file's suffix (`.css` → `text/css`, `.png` →
+`image/png`, and so on), falling back to `application/octet-stream` for anything
+unrecognised; the 404 page and any other response are otherwise sent with a
+`Content-Length` and `Connection: close`. Only the request line is parsed; request
+headers are read off the socket but ignored.
 
 Add pages by dropping files into `site/`. They are picked up on the next request for
 that path, and the body is cached in memory from the first hit onward, so restart the
@@ -143,11 +164,9 @@ separates suite from test with a slash, even though the output prints them with
 ./build/test/test_serve --filter 'serve/a_query*'
 ```
 
-The suite is green in a normal build. Some of the bugs still open in
-[KNOWN_ISSUES.md](KNOWN_ISSUES.md) only show up under a sanitizer, and the entry for
-each says which build surfaces it — so a green `ctest` is a weaker statement than it
-looks. Criterion runs every test in its own process, so a test that crashes is
-reported as a single `CRASH` and the rest of the suite still runs.
+The suite is green in a normal build. Criterion runs every test in its own process,
+so a test that crashes is reported as a single `CRASH` and the rest of the suite
+still runs rather than taking the run down with it.
 
 Configuring with `-DSANITIZE=address` builds the tests sanitized too, which is how
 the leaks in that list show up; see [DEVELOPMENT.md](DEVELOPMENT.md). To leave the
