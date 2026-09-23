@@ -9,13 +9,14 @@
  * REQUEST_BUFFER_SIZE - 1 bytes into a stack buffer, which is zero-filled
  * first so the read always ends in a NUL, then hands the buffer to
  * parse_request_buf.
- * client_fd: connected client socket, read from and written to. Closed by
- *            this call only when the read returns no bytes at all (an empty
- *            or failed read); on every other path the socket is left open
- *            for the caller (handle_request) to close.
- * Returns nothing. On a request line that does not parse, sends the 400
- * response and returns; otherwise logs the request and hands it to
- * global_req_handler. Only the request line is parsed; headers are ignored.
+ * client_fd: connected client socket, read from and written to. Never closed
+ *            by this call; the caller (handle_request) always closes it.
+ * Returns nothing. A read() error leaves the request unanswered -- there is
+ * nothing to usefully respond to. An empty read is not treated specially: it
+ * reaches parse_request_buf like any other input, fails to parse, and gets
+ * the same 400 response as any other request line that does not parse.
+ * Otherwise logs the request and hands it to global_req_handler. Only the
+ * request line is parsed; headers are ignored.
  */
 void handle_client(int client_fd);
 

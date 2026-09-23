@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <syscall.h>
 #include <string.h>
+#include <errno.h>
 
 void *handle_request(void *arg)
 {
@@ -54,12 +55,20 @@ void handle_client(int client_fd)
 {
     char buf[REQUEST_BUFFER_SIZE] = {0};
     ssize_t n = read(client_fd, buf, sizeof(buf) - 1);
-    if (n <= 0)
+    if (n < 0)
     {
-        close(client_fd);
+        /* A genuine read error, not an empty request: the socket is already
+         * broken, so there is nothing useful to write a response to.
+         * handle_request() closes client_fd on every path out of this
+         * function, so there is nothing to do here but log it and return. */
+        LOG_W("read() failed on client_fd %d: %s", client_fd, strerror(errno));
         return;
     }
 
+    /* n == 0 (the peer sent nothing) falls straight through: buf is still
+     * all zeros, parse_request_buf() can't find three tokens in it, and it
+     * gets the same 400 response as any other request line that doesn't
+     * parse, rather than the silent close this used to get. */
     http_request *req = init_request();
     req->client_fd = client_fd;
     if (parse_request_buf(buf, req) != 0)
