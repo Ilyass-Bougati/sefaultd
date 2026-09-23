@@ -136,7 +136,7 @@ captured_response do_request(const char *request)
     }
 
     /* Write the request, then close our writing side so the single read() in
-     * parse_request() sees the whole thing and does not block. */
+     * handle_client() sees the whole thing and does not block. */
     size_t len = strlen(request);
     if (len > 0 && write(sv[0], request, len) != (ssize_t)len) {
         perror("write request");
@@ -144,10 +144,15 @@ captured_response do_request(const char *request)
     }
     shutdown(sv[0], SHUT_WR);
 
-    parse_request(sv[1]);
+    handle_client(sv[1]);
 
-    /* parse_request() does not close the socket; handle_request() does that
-     * for a real connection. Closing it here is what ends the read loop. */
+    /* On a request that reads at least one byte, handle_client() leaves the
+     * socket open -- handle_request() is what closes it for a real
+     * connection -- so this close() is what ends the read loop below. On an
+     * empty request handle_client() has already closed sv[1] itself; closing
+     * it again here is harmless in this single-threaded harness (it just
+     * fails with EBADF), but is the same double-close handle_request() would
+     * hit on a live connection that sends nothing. */
     close(sv[1]);
 
     size_t cap = 8192;

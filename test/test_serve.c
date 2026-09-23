@@ -220,14 +220,20 @@ Test(serve, a_transient_read_failure_does_not_poison_the_cache)
 }
 
 /*
- * A client that connects and sends nothing at all. read() returns 0, the request
- * buffer stays empty, and sscanf matches none of its three fields -- so whatever
- * the parser does next has to cope with fields it never filled in.
+ * A client that connects and sends nothing at all: read() returns 0.
  *
- * This passes in a normal build and fails under -DSANITIZE=address, where the
- * uninitialised scratch buffer in parse_request() shows up as a heap-buffer
- * -overflow in strlen. See "An empty request reads past the end of a heap buffer"
- * in KNOWN_ISSUES.md.
+ * This used to be a sanitizer-only failure -- parse_request() read into a
+ * malloc'd scratch buffer that sscanf never wrote to on an empty request, and
+ * strlen() on it ran past the end. handle_client()'s request buffer is a
+ * zero-initialised stack array now, so that specific read is gone.
+ *
+ * It fails again today for an unrelated reason: handle_client() treats
+ * read() returning 0 as a special case, closing the socket and returning
+ * before parse_request_buf ever runs -- so an empty request gets no response
+ * at all, not even the 400 that a merely-unparseable-but-nonempty one now
+ * gets. Whether that silence is the intended behaviour for a client that
+ * never sent anything is a real question, not a stale assumption in this
+ * test; until it's answered, this stays failing on purpose.
  */
 Test(serve, an_empty_request_is_handled_without_reading_uninitialised_memory)
 {

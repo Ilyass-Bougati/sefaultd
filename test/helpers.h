@@ -36,7 +36,7 @@ void remove_site_file(const char *name);
 char *read_site_file(const char *name, size_t *out_len);
 
 /*
- * Feeds `request` through parse_request() over a socketpair and captures
+ * Feeds `request` through handle_client() over a socketpair and captures
  * everything written back. No listening socket and no threads involved.
  * Caller frees with free_captured().
  */

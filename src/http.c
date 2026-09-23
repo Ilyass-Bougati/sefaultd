@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include "request.h"
 #include "handler.h"
+#include "response.h"
 #include "log.h"
 #include <pthread.h>
 #include <syscall.h>
@@ -14,88 +15,58 @@ void *handle_request(void *arg)
     LOG_D("thread start, tid %d", (int)syscall(SYS_gettid));
 
     int client_fd = *(int *)arg;
-    parse_request(client_fd);
+    handle_client(client_fd);
     free(arg);
     close(client_fd);
     return NULL;
 }
 
-void parse_request(int client_fd)
+int parse_request_buf(char *buf, http_request *req)
 {
-    char *request_string = (char *)calloc(sizeof(char), REQUEST_BUFFER_SIZE);
-    if (read(client_fd, request_string, REQUEST_BUFFER_SIZE) == -1)
+    char path[2048] = {0};
+    if (sscanf(buf, "%7s %2047s %7s", req->method, path, req->version) != 3)
+        return -1;
+
+    char *q = strchr(path, '?');
+    if (q)
+        *q = '\0';
+
+    size_t len = 0;
+    char *save = NULL;
+    for (char *seg = strtok_r(path, "/", &save); seg; seg = strtok_r(NULL, "/", &save))
     {
-        perror("Error reading HTTP request");
-        exit(1);
+        if (strcmp(seg, "..") == 0 || strcmp(seg, ".") == 0)
+            continue;
+        size_t n = strlen(seg);
+        if (len + 1 + n >= sizeof(req->path))
+            return -1;
+        req->path[len++] = '/';
+        memcpy(req->path + len, seg, n);
+        len += n;
+    }
+    if (len == 0)
+        req->path[len++] = '/';
+    req->path[len] = '\0';
+    return 0;
+}
+
+void handle_client(int client_fd)
+{
+    char buf[REQUEST_BUFFER_SIZE] = {0};
+    ssize_t n = read(client_fd, buf, sizeof(buf) - 1);
+    if (n <= 0)
+    {
+        close(client_fd);
+        return;
     }
 
     http_request *req = init_request();
-    char *path = (char *)calloc(sizeof(char), 2048);
-    sscanf(request_string, "%7s %2047s %7s", req->method, path, req->version);
     req->client_fd = client_fd;
-
-    if (strcmp(path, "/") == 0)
+    if (parse_request_buf(buf, req) != 0)
     {
-        for (size_t i = 0; i < strlen(path); i++)
-        {
-            if (path[i] == '\0' || path[i] == '?')
-            {
-                req->path[i] = '\0';
-                break;
-            }
-            req->path[i] = path[i];
-        }
+        render_page(req, 400, BAD_REQUEST_PATH);
+        return;
     }
-    else
-    {
-        // removing any path variables
-        size_t buff_size = 1;
-        char *buff = malloc(buff_size);
-        if (buff == NULL)
-        {
-            free(path);
-            LOG_E("Error allocating buffer");
-            return;
-        }
-        buff[0] = '\0';
-
-        char *saveptr = NULL;
-        char *myPtr = strtok_r(path, "/", &saveptr);
-        while (myPtr != NULL)
-        {
-            if (strcmp(myPtr, "..") != 0)
-            {
-                buff_size += strlen(myPtr) + 1;
-                char *tmp = realloc(buff, buff_size);
-                if (tmp == NULL)
-                {
-                    free(buff);
-                    free(path);
-                    LOG_E("Error reallocating buffer");
-                    return;
-                }
-                buff = tmp;
-
-                strcat(buff, "/");
-                strcat(buff, myPtr);
-            }
-            myPtr = strtok_r(NULL, "/", &saveptr);
-        }
-
-        for (size_t i = 0; i < strlen(buff); i++)
-        {
-            if (buff[i] == '\0' || buff[i] == '?')
-            {
-                req->path[i] = '\0';
-                break;
-            }
-            req->path[i] = buff[i];
-        }
-        free(buff);
-    }
-
-    free(path);
     log_http_req(req);
     global_req_handler(req);
-    free(request_string);
 }

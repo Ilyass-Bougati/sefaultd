@@ -9,6 +9,9 @@
 /* The page sent for a request that matches no file. */
 #define NOT_FOUND_PATH SITE_DIR "/not_found.html"
 
+/* The page sent for a request line that could not be parsed. */
+#define BAD_REQUEST_PATH SITE_DIR "/bad_request.html"
+
 /* Built into the binary, and sent only when NOT_FOUND_PATH itself cannot be
  * read, so that a broken site directory still gets an answer. */
 #define NOT_FOUND_HTML "<h1>This page wasn't found</h1><a href=\"/\">go back to home</a>"
