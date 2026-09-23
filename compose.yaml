@@ -2,7 +2,24 @@ services:
   app:
     build: .
     container_name: sefaultd
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: 0.5
+    pids_limit: 64
     volumes:
       - ./logs:/logs
-    ports:
-      - "8080:8080"
+    networks:
+      portfolio:
+        ipv4_address: 172.30.0.10
+
+networks:
+  portfolio:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

@@ -47,6 +47,10 @@ by git; deleting that directory is the full clean.
 ```bash
 cmake -S . -B build
 cmake --build build
+
+# using docker compose
+sudo chown 65534:65534 ./logs
+docker compose up -d
 ```
 
 That produces `build/sefaultd`. `site/` is resolved against the working directory,
@@ -59,11 +63,11 @@ listens on port 8080:
 
 Options:
 
-| Flag             | Meaning                                        | Default |
-| ---------------- | ----------------------------------------------- | ------- |
-| `-p`, `--port`   | port to listen on                                | `8080`  |
-| `-l`, `--log`    | log level: `DEBUG`, `INFO`, `WARN`, or `ERROR`   | `INFO`  |
-| `-h`, `--help`   | print the option list and exit                   |         |
+| Flag           | Meaning                                        | Default |
+| -------------- | ---------------------------------------------- | ------- |
+| `-p`, `--port` | port to listen on                              | `8080`  |
+| `-l`, `--log`  | log level: `DEBUG`, `INFO`, `WARN`, or `ERROR` | `INFO`  |
+| `-h`, `--help` | print the option list and exit                 |         |
 
 ```bash
 ./build/sefaultd --port 9000 --log DEBUG
