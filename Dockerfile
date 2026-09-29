@@ -7,7 +7,7 @@ COPY include include
 COPY src src
 COPY vendor vendor
 
-RUN cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-static" -DBUILD_TESTING=OFF
+RUN cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-static -s" -DBUILD_TESTING=OFF
 RUN cmake --build build
 
 FROM scratch
