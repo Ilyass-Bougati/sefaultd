@@ -71,6 +71,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+
     // initializing the variables
     int server_fd, client_fd;
     struct sockaddr_in address;

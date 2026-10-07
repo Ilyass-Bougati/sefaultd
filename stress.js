@@ -31,7 +31,7 @@ export const options = {
   },
 };
 
-const BASE = __ENV.BASE || 'http://locahost:8080';
+const BASE = __ENV.BASE || 'https://ilyass-bougati.dev';
 
 // Short timeout: a hang must surface as a failed request, not a stalled VU.
 const PARAMS = { timeout: '3s' };
